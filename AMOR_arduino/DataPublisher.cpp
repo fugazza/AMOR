@@ -23,22 +23,20 @@ void DataPublisher::registerDataListener(DataListener &newListener, byte _dataId
 
 void DataPublisher::fireDataUpdate(byte dataID, const char *value) {
   for (int i=0; i<DATA_LISTENERS_SIZE; i++) {
-    if (dataListeners[i].assigned
-        && (dataListeners[i].dataIdRequired == dataID || dataListeners[i].dataIdRequired == DATA_ID_ALL)) {
-          
-      dataListeners[i].listener->dataUpdated(dataID, value);
-      
+    if (dataListeners[i].assigned && dataListeners[i].isDataIdRequired(dataID)) {          
+      dataListeners[i].listener->dataUpdated(dataID, value);      
     }
   }  
 }
 
 void DataPublisher::fireDataUpdate(byte dataID, float88 value) {
   for (int i=0; i<DATA_LISTENERS_SIZE; i++) {
-    if (dataListeners[i].assigned
-        && (dataListeners[i].dataIdRequired == dataID || dataListeners[i].dataIdRequired == DATA_ID_ALL)) {
-          
-      dataListeners[i].listener->dataUpdated(dataID, value);
-      
+    if (dataListeners[i].assigned && dataListeners[i].isDataIdRequired(dataID)) {          
+      dataListeners[i].listener->dataUpdated(dataID, value);      
     }
   }  
+}
+
+bool DataListenerInfo::isDataIdRequired(byte dataId) {
+  return (dataIdRequired & dataId) > 0;
 }

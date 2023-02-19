@@ -13,6 +13,8 @@ struct DataListenerInfo {
   DataListener *listener;
   bool assigned = false;
   byte dataIdRequired = DATA_ID_ALL;
+
+  bool isDataIdRequired(byte dataId);
 };
 
 class DataPublisher

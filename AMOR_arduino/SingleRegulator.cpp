@@ -74,6 +74,7 @@ void SingleRegulator::loop() {
         break;
     }
 
+    commandActuator(boilerState);
     publishData(PSTR(SR_REGULATOR_ON_OFF),          boilerState);
     publishData(PSTR(SR_ROOM_TEMPERATURE),          roomTemperature);
     publishData(PSTR(SR_ROOM_TEMPERATURE_SETPOINT), getRoomSetpoint(activeProgram));
@@ -226,6 +227,20 @@ void SingleRegulator::publishData(const char *dataName, bool value) {
     strcat_P(topicBuffer,PSTR("/"));
     strcat_P(topicBuffer,dataName);
     strcpy(valueBuffer, value ? "1" : "0");
+    _communicator->publishTopic(topicBuffer, valueBuffer);
+  }
+}
+
+void SingleRegulator::setActuator(const char *actuatorTopic) {
+  _actuatorTopic = actuatorTopic;
+}
+
+void SingleRegulator::commandActuator(bool actuatorState) {
+  if (_actuatorTopic != nullptr && _communicator != nullptr) {
+    char topicBuffer[64];
+    char valueBuffer[2];
+    strcpy_P(topicBuffer,_actuatorTopic);
+    strcpy(valueBuffer, actuatorState ? "1" : "0");
     _communicator->publishTopic(topicBuffer, valueBuffer);
   }
 }

@@ -62,9 +62,11 @@ class SingleRegulator: public DataListener
     void  dataUpdated(byte dataID, const char *value) {};
     void  dataUpdated(byte dataID, float88 value);
     void  setCommunicator(AbstractCommunicator &newCommunicator);
+    void  setActuator(const char *actuatorTopic);
 
   private:
     const char *_name;
+    const char *_actuatorTopic = nullptr;
     AbstractBoiler *_boiler;
     AbstractCommunicator *_communicator = nullptr;
     float88 roomTemperature=-100.0;
@@ -86,6 +88,7 @@ class SingleRegulator: public DataListener
     void resetPID();
     void publishData(const char *dataName, float value);
     void publishData(const char *dataName, bool value); 
+    void commandActuator(bool actuatorState);
    
 };
 #endif
