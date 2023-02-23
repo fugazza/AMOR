@@ -2,6 +2,7 @@
 AMOR = **A**rduino **M**odular **O**penTherm **R**egulator
 
 AMOR is a framework which enables you to build your own HVAC regulator on Arduino and customize it to your needs.
+![Example schematic of HVAC system with AMOR](schematic_1_homepage.png)
 
 ## What you can make with AMOR
 - **gateway**, man in the middle, message sniffer to see, how the thermostat is communicating with the boiler
