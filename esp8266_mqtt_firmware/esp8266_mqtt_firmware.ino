@@ -1,6 +1,6 @@
 /*  
  *  esp8266_mqtt_firmware
- *  version: v1.0
+ *  version: v1.1
  *  Board: ESP8266
  *  
  *  Firmware responsible for linking Arduino with installed AMOR (Arduino Modular Opentherm Regulator) to the MQTT server via wifi.
@@ -10,6 +10,7 @@
  *  - if the message in format "#S:[topic]\r\n" is received, then it subscribes to the MQTT [topic] 
  *    when new [value] is received through this [topic], then following message is sent to the serial port: "V=[topic]:[value]"   
  *  - sends an actual date-time info to the serial port in regular intervals. Format is "T=[dd].[mm].[yyyy] [hh]:[ii]:[ss]"
+ *  - after startup it announces the underlaying Arduino, that it has started by message "S=started"
  *  
  */
 
@@ -41,17 +42,19 @@
  */
 #define NTP_SERVER "pool.ntp.org"
 
-/* how often the time is synchronized from NTP server
+/* how often the time is is provided from ESP8266 to underlaying Arduino
  * default value: 1200 (= 1200 s = 20 min)
  */
 #define NTP_UPDATE_INTERVAL 1200
 
-/* timezone offset in seconds
- * e.g. Europe = GMT+1 => set 3600 (= 3600 s = 1 hour)
- * e.g. New York = EST = GMT-5 => set -18000 (= -18.000 s = -5 hours)
- * default value: 1200
+/* timezone definition for NTP time update
+ * choose your timezone from the list at https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
+ * or modify according to this logic:
+ *   daylight savings time starts at March = month (M3), fifth week (5), on Sunday (0) at two o'clock (02)
+ *   winter time starts at October (M10), fifth week (5), on Sunday (0) at three o'clock (03)
+ * default value: "CET-1CEST,M3.5.0/02,M10.5.0/03"
  */
-#define TIMEZONE_OFFSET 3600
+#define NTP_TIMEZONE "CET-1CEST,M3.5.0/02,M10.5.0/03" 
 
 /* debugging messages */
 //#define DEBUG  // Comment this line to disable debug serial output.
@@ -64,8 +67,7 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <TickTwo.h>
-#include <NTPClient.h>
-#include <WiFiUdp.h>
+#include <time.h>
 #include "config.h"
 
 #ifdef DEBUG
@@ -111,14 +113,11 @@ char subscribedTopics[SUBSCRIBED_TOPICS_LIST_LENGTH][MAX_TOPIC_LENGTH];
 boolean firstNTPsynchro = false;
 void callbackNTPupdate(); // forward declaration - the definition of the callback function is below
 TickTwo tickerNTPupdate(callbackNTPupdate, 10000); // first synchronizations occurs 10.000ms = 10s after startup of this ESP8266
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, NTP_SERVER);
-
 
 void setup() {
   Serial.begin(115200); 
   delay(50);
-  DPRINTLN(F("esp8266_mqtt_firmware - version 1.0"));
+  DPRINTLN(F("esp8266_mqtt_firmware - version 1.1"));
   DPRINTLN(F("-----------------------------------"));
 
   DPRINT(F("MAC: "));      
@@ -130,13 +129,14 @@ void setup() {
   // connect to the MQTT server
   connectMQTT();
 
-  // start the NTP time synchronization client
-  timeClient.begin();
-  // set the timezone
-  timeClient.setTimeOffset(TIMEZONE_OFFSET);
+  // start the NTP time synchronization
+  configTime(NTP_TIMEZONE, NTP_SERVER);
 
   // start the ticker (timer, scheduler) for NTP synchronizations
   tickerNTPupdate.start();
+
+  // announce Arduino, that the ESP8266 wifi module has started and is ready to listen
+  Serial.println("S=started");  
 }
 
  
@@ -346,20 +346,27 @@ void callbackNTPupdate() {
 
   if (wifiConnected) {
     // we can synchrnize the time through NTP once we are successfully connected to the wifi
-    timeClient.update();
+    time_t now;
+    tm tm; 
+
+    time(&now);
+    localtime_r(&now, &tm);
+
 
     // send the updated date time to the serial port
     // in format "T=[dd].[mm].[yyyy] [hh]:[ii]:[ss]"
-    time_t epochTime = timeClient.getEpochTime();
-    struct tm *ptm = gmtime ((time_t *)&epochTime); 
     Serial.print("T=");
-    Serial.print(ptm->tm_mday);
+    Serial.print(tm.tm_mday);
     Serial.print(".");
-    Serial.print((ptm->tm_mon+1));
+    Serial.print((tm.tm_mon+1));
     Serial.print(".");
-    Serial.print((ptm->tm_year+1900));
+    Serial.print((tm.tm_year+1900));
     Serial.print(" ");
-    Serial.println(timeClient.getFormattedTime());
+    Serial.print(tm.tm_hour);
+    Serial.print(":");
+    Serial.print(tm.tm_min);
+    Serial.print(":");
+    Serial.println(tm.tm_sec); 
     
     // first NTP synchronization occurs soon (10 seconds) after startup of the ESP8266
     // following synchronizations occur repeatedly in NTP_UPDATE_INTERVAL
@@ -402,4 +409,12 @@ void registerSubscribedTopic(const char *topic) {
       break;
     }    
   }
+}
+
+/*
+ * sets up that the NTP time synchronization starts earlier than default 60s
+ */
+uint32_t sntp_startup_delay_MS_rfc_not_less_than_60000 ()
+{
+  return 8000UL; // 8s
 }
